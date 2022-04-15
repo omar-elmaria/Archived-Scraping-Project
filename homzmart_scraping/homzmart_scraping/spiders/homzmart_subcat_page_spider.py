@@ -10,6 +10,8 @@ from homzmart_scraping.items import SubCatPageItem
 from scrapy.loader import ItemLoader
 import json
 from unidecode import unidecode
+import logging
+from playwright.async_api import Response, Request
 
 # Access the output of the "homzmart_cat_page_spider" script stored in the JSON file 'Output_Cat_Page.json'
 with open('Output_Cat_Page.json', 'r') as file:
@@ -17,6 +19,17 @@ with open('Output_Cat_Page.json', 'r') as file:
 
 urls_from_cat_page = [d['sub_cat_url'] for d in data] # No need to define first_url in the spider class below anymore as we are reading the output of the previous script
 urls_from_cat_page = urls_from_cat_page[-3:-2:1] # For TESTING purposes (Strength & Weight Equipment sub-category ONLY - 4 page with 65 products)
+
+# Logging
+logger = logging.getLogger(__name__)
+
+async def handle_response(response: Response):
+    logger.info(response.url + " " + str(response.status))
+    logger.info(response.headers)
+    return
+
+async def handle_request(request: Request):
+    logger.info(request.headers)
 
 class SubCatPageSpider(scrapy.Spider): # Extract the individual product page links from the sub-category pages
     name = 'sub_cat_page_spider'
@@ -29,12 +42,10 @@ class SubCatPageSpider(scrapy.Spider): # Extract the individual product page lin
                 playwright = True,
                 playwright_include_page = True,
                 playwright_page_methods = [PageMethod('wait_for_selector', 'div.card-body')],
-                playwright_context_kwargs = dict(
-                    proxy = {
-                        "server": "proxy.zyte.com:8011",
-                        "username": "3c9fb0a16f1e4af084e65c6b2037ea3e",
-                        "password": "12345",
-                    },
+                playwright_context = "default",
+                playwright_page_event_handlers = dict(
+                    response = handle_response,
+                    request = handle_request
                 )
             ))
 
@@ -49,12 +60,10 @@ class SubCatPageSpider(scrapy.Spider): # Extract the individual product page lin
                         playwright = True,
                         playwright_include_page = True,
                         playwright_page_methods = [PageMethod('wait_for_selector', 'div.card-body')],
-                        playwright_context_kwargs = dict(
-                            proxy = {
-                                "server": "proxy.zyte.com:8011",
-                                "username": "3c9fb0a16f1e4af084e65c6b2037ea3e",
-                                "password": "12345",
-                            },
+                        playwright_context = "default",
+                        playwright_page_event_handlers = dict(
+                            response = handle_response,
+                            request = handle_request
                         )
                     ))
 
@@ -96,13 +105,18 @@ process = CrawlerProcess(settings = {
     "DOWNLOAD_DELAY": 3,
     "ROBOTSTXT_OBEY": False, # Saves one API call
 
-    "PLAYWRIGHT_LAUNCH_OPTIONS": {
-        "proxy": {
-            "server": "proxy.zyte.com:8011",
-            "username": "3c9fb0a16f1e4af084e65c6b2037ea3e",
-            "password": "12345",
-        },
-    }
+    "PLAYWRIGHT_CONTEXTS": {
+        "default": {
+            "proxy": {
+                "server": "proxy.zyte.com:8011",
+                "username": "3c9fb0a16f1e4af084e65c6b2037ea3e",
+                "password": "12345",
+            },
+            "ignore_https_errors": True,
+        }
+    },
+
+    "PLAYWRIGHT_BROWSER_TYPE": "firefox"
     
     # # Autothrottling and being polite to the server
     # "AUTOTHROTTLE_ENABLED": True,
